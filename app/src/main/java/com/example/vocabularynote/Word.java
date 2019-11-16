@@ -22,12 +22,13 @@ public class Word {
     public void setChinese_invisible(boolean chinese_invisible) {
         this.chinese_invisible = chinese_invisible;
     }
-
     public Word(String word, String chineseMeaning) {
         this.word = word;
         this.chineseMeaning = chineseMeaning;
     }
-
+    public boolean getchinese_invisible(){
+        return chinese_invisible;
+    }
     public void setId(int id) {
         this.id = id;
     }

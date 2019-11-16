@@ -15,23 +15,33 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.view.menu.MenuView;
 import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.lifecycle.ViewModel;
+import androidx.recyclerview.widget.DiffUtil;
+import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
-    private List<Word> allWords = new ArrayList<>();
+public class MyAdapter extends ListAdapter<Word, MyAdapter.MyViewHolder> {
     private boolean UseCardView;
     private WordViewModel viewModel;
 
     public MyAdapter(boolean useCardView, WordViewModel viewModel) {
+        super(new DiffUtil.ItemCallback<Word>() {
+            @Override
+            public boolean areItemsTheSame(@NonNull Word oldItem, @NonNull Word newItem) {
+                return oldItem.getId() == newItem.getId();
+            }
+
+            @Override
+            public boolean areContentsTheSame(@NonNull Word oldItem, @NonNull Word newItem) {
+                return (oldItem.getWord().equals(newItem.getWord())
+                        && oldItem.getChineseMeaning().equals(newItem.getChineseMeaning())
+                        && oldItem.getchinese_invisible() == newItem.getchinese_invisible());
+            }
+        });
         this.UseCardView = useCardView;
         this.viewModel = viewModel;
-    }
-
-    public void setAllWords(List<Word> allWords) {
-        this.allWords = allWords;
     }
 
     @NonNull
@@ -58,7 +68,7 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
         holder.aSwitchChInvisible.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                Word word= (Word) holder.itemView.getTag(R.id.word_for_view_holder);
+                Word word = (Word) holder.itemView.getTag(R.id.word_for_view_holder);
                 if (isChecked) {
                     holder.tv_ch.setVisibility(View.GONE);
                     word.setChinese_invisible(true);
@@ -74,9 +84,15 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
     }
 
     @Override
+    public void onViewAttachedToWindow(@NonNull MyViewHolder holder) {
+        super.onViewAttachedToWindow(holder);
+        holder.tv_num.setText(String.valueOf(holder.getAdapterPosition()+1));
+    }
+
+    @Override
     public void onBindViewHolder(@NonNull final MyViewHolder holder, int position) {
-        final Word word = allWords.get(position);
-        holder.itemView.setTag(R.id.word_for_view_holder,word);
+        final Word word = getItem(position);
+        holder.itemView.setTag(R.id.word_for_view_holder, word);
         holder.tv_num.setText(String.valueOf(position + 1));
         holder.tv_eng.setText(word.getWord());
         holder.tv_ch.setText(word.getChineseMeaning());
@@ -89,10 +105,6 @@ public class MyAdapter extends RecyclerView.Adapter<MyAdapter.MyViewHolder> {
         }
     }
 
-    @Override
-    public int getItemCount() {
-        return allWords.size();
-    }
 
     static class MyViewHolder extends RecyclerView.ViewHolder {
         TextView tv_num, tv_eng, tv_ch;

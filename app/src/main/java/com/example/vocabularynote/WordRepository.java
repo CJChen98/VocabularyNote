@@ -21,6 +21,10 @@ public class WordRepository {
         return allWordsLive;
     }
 
+    LiveData<List<Word>> findWordsWithstr(String str) {
+        return wordDao.findWordsWithstr("%" + str + "%");
+    }
+
     void insertWord(Word... words) {
         new InsertAsyncTask(wordDao).execute(words);
     }
@@ -93,4 +97,5 @@ public class WordRepository {
             return null;
         }
     }
+
 }

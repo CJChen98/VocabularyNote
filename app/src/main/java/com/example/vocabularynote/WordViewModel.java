@@ -21,7 +21,9 @@ public class WordViewModel extends AndroidViewModel {
     LiveData<List<Word>> getAllWordsLive() {
         return wordRepository.getAllWordsLive();
     }
-
+    LiveData<List<Word>> findWordsWithstr(String str){
+        return wordRepository.findWordsWithstr(str);
+    }
     void insertWord(Word... words) {
         wordRepository.insertWord(words);
     }
