@@ -5,10 +5,15 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.Observer;
@@ -16,6 +21,8 @@ import androidx.lifecycle.ViewModelProviders;
 import androidx.navigation.NavController;
 import androidx.navigation.Navigation;
 import androidx.recyclerview.widget.DefaultItemAnimator;
+import androidx.recyclerview.widget.DividerItemDecoration;
+import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -28,8 +35,10 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.SearchView;
+import android.widget.Toast;
 
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.android.material.snackbar.Snackbar;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -46,6 +55,9 @@ public class WordsFragment extends Fragment {
     private LiveData<List<Word>> filterWords;
     private static final String style_shp_key = "style_shp_key";
     private static final String use_card_view = "use_card_view";
+    private List<Word> allWords;
+    private boolean undoAction = false, deleteAction = false;
+    private DividerItemDecoration dividerItemDecoration;
 
     public WordsFragment() {
         // Required empty public constructor
@@ -73,6 +85,7 @@ public class WordsFragment extends Fragment {
                     @Override
                     public void onChanged(List<Word> words) {
                         int temp = myAdapter1.getItemCount();
+                        allWords = words;
                         if (temp != words.size()) {
                             myAdapter1.submitList(words);
                             myAdapter2.submitList(words);
@@ -114,16 +127,17 @@ public class WordsFragment extends Fragment {
                         }
                     }
                 }
-                recyclerView.smoothScrollToPosition(0);
+
             }
         });
-
+        dividerItemDecoration = new DividerItemDecoration(requireActivity(), DividerItemDecoration.VERTICAL);
         SharedPreferences shp = requireActivity().getSharedPreferences(style_shp_key, Context.MODE_PRIVATE);
         boolean style = shp.getBoolean(use_card_view, false);
         if (style) {
             recyclerView.setAdapter(myAdapter2);
         } else {
             recyclerView.setAdapter(myAdapter1);
+            recyclerView.addItemDecoration(dividerItemDecoration);
         }
 
         filterWords = wordViewModel.getAllWordsLive();
@@ -131,12 +145,84 @@ public class WordsFragment extends Fragment {
             @Override
             public void onChanged(List<Word> words) {
                 int temp = myAdapter1.getItemCount();
+                allWords = words;
                 if (temp != words.size()) {
+                    if (temp < words.size() && !undoAction) {
+                        recyclerView.smoothScrollToPosition(0);
+                        recyclerView.smoothScrollBy(0,-200);
+                    }
                     myAdapter1.submitList(words);
                     myAdapter2.submitList(words);
+                    deleteAction = false;
+                    undoAction = false;
                 }
+
             }
         });
+
+        new ItemTouchHelper(new ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.START | ItemTouchHelper.END) {
+            @Override
+            public boolean onMove(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder, @NonNull RecyclerView.ViewHolder target) {
+                return false;
+            }
+
+            @Override
+            public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
+                final Word wordToDelete = allWords.get(viewHolder.getAdapterPosition());
+                wordViewModel.deleteWord(wordToDelete);
+                deleteAction = true;
+                Snackbar.make(requireView().findViewById(R.id.wordsfragmentView),
+                        "You delete a word",
+                        Snackbar.LENGTH_SHORT)
+                        .setAction("Undo", new View.OnClickListener() {
+                            @Override
+                            public void onClick(View v) {
+                                undoAction = true;
+                                wordViewModel.insertWord(wordToDelete);
+                            }
+                        })
+                        .show();
+            }
+
+            //在滑动的时候，画出浅灰色背景和垃圾桶图标，增强删除的视觉效果
+            Drawable icon = ContextCompat.getDrawable(requireActivity(), R.drawable.ic_delete_forever_wite_24dp);
+            Drawable background = new ColorDrawable(Color.rgb(178, 34, 34));
+
+            @Override
+            public void onChildDraw(@NonNull Canvas c, @NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder, float dX, float dY, int actionState, boolean isCurrentlyActive) {
+                super.onChildDraw(c, recyclerView, viewHolder, dX, dY, actionState, isCurrentlyActive);
+                View itemView = viewHolder.itemView;
+                int iconMargin = (itemView.getHeight() - icon.getIntrinsicHeight()) / 2;
+
+                int iconLeft, iconRight, iconTop, iconBottom;
+                int backTop, backBottom, backLeft, backRight;
+                backTop = itemView.getTop();
+                backBottom = itemView.getBottom();
+                iconTop = itemView.getTop() + (itemView.getHeight() - icon.getIntrinsicHeight()) / 2;
+                iconBottom = iconTop + icon.getIntrinsicHeight();
+                if (dX > 0) {
+                    backLeft = itemView.getLeft();
+                    backRight = itemView.getLeft() + (int) dX;
+                    background.setBounds(backLeft, backTop, backRight, backBottom);
+                    iconLeft = itemView.getLeft() + iconMargin;
+                    iconRight = iconLeft + icon.getIntrinsicWidth();
+                    icon.setBounds(iconLeft, iconTop, iconRight, iconBottom);
+                } else if (dX < 0) {
+                    backRight = itemView.getRight();
+                    backLeft = itemView.getRight() + (int) dX;
+                    background.setBounds(backLeft, backTop, backRight, backBottom);
+                    iconRight = itemView.getRight() - iconMargin;
+                    iconLeft = iconRight - icon.getIntrinsicWidth();
+                    icon.setBounds(iconLeft, iconTop, iconRight, iconBottom);
+                } else {
+                    background.setBounds(0, 0, 0, 0);
+                    icon.setBounds(0, 0, 0, 0);
+                }
+                background.draw(c);
+                icon.draw(c);
+            }
+        }).attachToRecyclerView(recyclerView);
+
         floatingActionButton = requireActivity().findViewById(R.id.floatingActionButton);
         floatingActionButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -173,9 +259,11 @@ public class WordsFragment extends Fragment {
                 SharedPreferences.Editor editor = shp.edit();
                 if (style) {
                     recyclerView.setAdapter(myAdapter1);
+                    recyclerView.addItemDecoration(dividerItemDecoration);
                     editor.putBoolean(use_card_view, false);
                 } else {
                     recyclerView.setAdapter(myAdapter2);
+                    recyclerView.removeItemDecoration(dividerItemDecoration);
                     editor.putBoolean(use_card_view, true);
                 }
                 editor.apply();
